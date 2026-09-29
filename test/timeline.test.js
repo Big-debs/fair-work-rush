@@ -10,6 +10,7 @@ import {
 import { summarizeCompensation } from '../src/game/economy/WageEngine.js';
 import { LIVE_IN_EVENTS } from '../src/data/tasks.js';
 import { SCENARIOS, getScenario, selectScenarioEvents } from '../src/data/scenarios.js';
+import { getGameDimensions, getTimelineModel } from '../src/game/LayoutModel.js';
 
 const events = [
   { id: 'interrupt', at: 7 * 60, title: 'Interruption', body: '', minutes: 20, staminaDelta: -5, additional: true, interruption: true },
@@ -230,4 +231,29 @@ test('recorded requests strengthen an evidence-led debrief', () => {
   assert.deepEqual(GameState.session.lastDebrief, {
     choiceId: 'evidence', scenarioId: 'ordinary-day', usedRecords: true
   });
+});
+
+test('phase 4 uses a native portrait scene on small phones', () => {
+  assert.deepEqual(getGameDimensions(390), { width: 390, height: 720, compact: true });
+  assert.deepEqual(getGameDimensions(800), { width: 800, height: 600, compact: false });
+});
+
+test('agreement and actual work use the same 24-hour timeline scale', () => {
+  const timeline = getTimelineModel({
+    expectedMinutes: 480,
+    totalWorkMinutes: 600,
+    clockMinutes: 17 * 60 + 30
+  });
+
+  assert.equal(Math.round(timeline.expectedPercent), 33);
+  assert.equal(Math.round(timeline.actualPercent), 42);
+  assert.equal(timeline.elapsedPercent, 50);
+});
+
+test('timeline values stay within visible bounds', () => {
+  const timeline = getTimelineModel({ expectedMinutes: 0, totalWorkMinutes: 2000, clockMinutes: 4000 });
+
+  assert.equal(timeline.expectedPercent, 0);
+  assert.equal(timeline.actualPercent, 100);
+  assert.equal(timeline.elapsedPercent, 100);
 });

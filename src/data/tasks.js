@@ -1,9 +1,9 @@
 export const TASKS = [
-  { id: 'breakfast', name: 'Prepare breakfast', minutes: 60, staminaDelta: -10, type: 'work' },
-  { id: 'clean', name: 'House cleaning', minutes: 90, staminaDelta: -20, type: 'work' },
-  { id: 'laundry', name: 'Laundry & ironing', minutes: 90, staminaDelta: -22, type: 'work' },
-  { id: 'rest', name: 'Take a break', minutes: 30, staminaDelta: 12, type: 'personal' },
-  { id: 'sleep', name: 'Sleep', minutes: 420, staminaDelta: 45, type: 'sleep' }
+  { id: 'breakfast', name: 'Prepare breakfast', shortName: 'Breakfast', context: 'KITCHEN', minutes: 60, staminaDelta: -10, type: 'work', accent: 0xd97745 },
+  { id: 'clean', name: 'House cleaning', shortName: 'Clean rooms', context: 'HOUSE', minutes: 90, staminaDelta: -20, type: 'work', accent: 0x4f7c78 },
+  { id: 'laundry', name: 'Laundry & ironing', shortName: 'Laundry', context: 'UTILITY', minutes: 90, staminaDelta: -22, type: 'work', accent: 0x526d9f },
+  { id: 'rest', name: 'Take a break', shortName: 'Take a break', context: 'PERSONAL', minutes: 30, staminaDelta: 12, type: 'personal', accent: 0x3f8f72 },
+  { id: 'sleep', name: 'Sleep', shortName: 'Sleep', context: 'RECOVERY', minutes: 420, staminaDelta: 45, type: 'sleep', accent: 0x65558f }
 ];
 
 export const LIVE_IN_EVENTS = [

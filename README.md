@@ -65,3 +65,20 @@ single scripted shift:
   and the last debrief choice persist across days.
 - Every results screen leads to an end-of-day conversation. Recorded requests
   make an evidence-led conversation more effective.
+
+## Phase 4 visual and interaction system
+
+Phase 4 replaces the prototype dashboard treatment with a warmer, editorial
+household experience that remains legible on small phones:
+
+- The playable scene now has an illustrated household, character-specific
+  portraits, contextual task cards, and a palette that cools as pressure and
+  fatigue increase.
+- A shared agreement/reality timeline compares agreed time, counted work, and
+  the current point in the day on the same scale.
+- Tasks, interruptions, boundaries, and end-of-day outcomes collect in a live
+  activity record beside the game and below it on narrow screens.
+- Mobile devices receive a native 390 × 720 portrait scene rather than a scaled
+  desktop canvas, with single-column decisions and minimum 44px DOM controls.
+- Players can enlarge interface text and enable calm motion. System-level
+  reduced-motion preferences are respected automatically.
