@@ -16,6 +16,7 @@ body{background:#070b14;color:#e5e7eb;font-family:Inter,system-ui,sans-serif}
 .fill.wellbeing{background:#22c55e}
 .fill.trust{background:#a78bfa}
 .fill.pressure{background:#f97316}
+.fill.confidence{background:#14b8a6}
 .canvas{height:600px;position:relative;background:#0b1220}
 .phaser-root{position:absolute;inset:0;width:100%;height:100%}
 .phaser-root canvas{display:block;margin:auto;max-width:100%;height:auto}

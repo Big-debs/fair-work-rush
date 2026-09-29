@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GameState } from '../GameState.js';
-import { TASKS, LIVE_IN_EVENTS } from '../../data/tasks.js';
+import { TASKS } from '../../data/tasks.js';
+import { getWorkerProfile } from '../../data/scenarios.js';
 import { getDecisionOptions } from '../DecisionModel.js';
 import { advanceUntilDecision, resolveEventDecision } from '../TimelineEngine.js';
 
@@ -26,22 +27,28 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor('#07111f');
+    if (!GameState.currentScenario) GameState.startScenario();
+    this.scenario = GameState.currentScenario;
+    this.profile = getWorkerProfile(this.scenario.profileId);
     this.shift = GameState.resetDay();
     this.actionLocked = false;
     this.currentAction = null;
 
-    this.add.text(400, 34, 'LIVE-IN HOUSEHOLD · DAY 1', {
+    this.add.text(400, 28, `${this.scenario.tag} · ${this.profile.name.toUpperCase()} · DAY ${GameState.day}`, {
       fontSize: '22px', color: '#e2e8f0', fontStyle: 'bold'
     }).setOrigin(.5);
-    this.add.text(400, 65, 'Being on the premises does not automatically mean being at work.', {
-      fontSize: '14px', color: '#94a3b8'
+    this.add.text(400, 58, this.scenario.title, {
+      fontSize: '15px', color: '#60a5fa', fontStyle: 'bold'
+    }).setOrigin(.5);
+    this.add.text(400, 80, this.scenario.openingNote, {
+      fontSize: '12px', color: '#94a3b8', align: 'center', wordWrap: { width: 680 }
     }).setOrigin(.5);
 
-    this.clockText = this.add.text(400, 105, '', {
+    this.clockText = this.add.text(400, 116, '', {
       fontSize: '34px', color: '#f8fafc', fontStyle: 'bold'
     }).setOrigin(.5);
 
-    this.stateText = this.add.text(400, 140, '', {
+    this.stateText = this.add.text(400, 150, '', {
       fontSize: '14px', color: '#60a5fa'
     }).setOrigin(.5);
 
@@ -50,7 +57,7 @@ export class GameScene extends Phaser.Scene {
     this.createEventPanel();
     this.createDecisionPanel();
     this.updateDisplay();
-    this.emit('Your day starts at 5:30 AM.');
+    this.emit(`${this.profile.name}'s day starts at 5:30 AM.`);
   }
 
   drawWorker() {
@@ -140,7 +147,7 @@ export class GameScene extends Phaser.Scene {
       this.shift,
       action.remainingMinutes,
       action.activity,
-      LIVE_IN_EVENTS
+      GameState.currentEvents
     );
     action.remainingMinutes = result.uncompletedMinutes;
     this.updateDisplay();
@@ -231,6 +238,7 @@ export class GameScene extends Phaser.Scene {
       wellbeing: summary.wellbeing,
       householdTrust: this.shift.householdTrust,
       boundaryPressure: this.shift.boundaryPressure,
+      confidence: this.shift.confidence,
       stress: this.shift.stress,
       shiftHours: this.shift.activeMinutes / 60,
       earnings: 0,

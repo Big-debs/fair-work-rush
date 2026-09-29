@@ -49,3 +49,19 @@ how to respond:
 The HUD tracks worker wellbeing, household trust, and boundary pressure. The
 results screen compares the agreement with the actual day and explains the
 pattern created by the player's decisions.
+
+## Phase 3 scenario journey
+
+The prototype now supports a small, replayable narrative journey rather than a
+single scripted shift:
+
+- Six situations cover an ordinary day, unexpected visitors, care work, an
+  interrupted day off, overnight demands, and a pay/responsibilities dispute.
+- Three worker profiles and both live-in and live-out agreements make the same
+  kinds of requests visible in different contexts.
+- Each run includes one controlled event variation, selected predictably so
+  playthroughs remain reproducible.
+- Household trust, boundary pressure, worker confidence, completed situations,
+  and the last debrief choice persist across days.
+- Every results screen leads to an end-of-day conversation. Recorded requests
+  make an evidence-led conversation more effective.

@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
+import { ScenarioScene } from './scenes/ScenarioScene';
 import { GameScene } from './scenes/GameScene';
 import { ResultScene } from './scenes/ResultScene';
+import { DebriefScene } from './scenes/DebriefScene';
 
 export function createGameConfig(parent) {
   return {
@@ -20,6 +22,6 @@ export function createGameConfig(parent) {
       width: 800,
       height: 600
     },
-    scene: [BootScene, GameScene, ResultScene]
+    scene: [BootScene, ScenarioScene, GameScene, ResultScene, DebriefScene]
   };
 }

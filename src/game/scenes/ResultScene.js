@@ -29,18 +29,22 @@ export class ResultScene extends Phaser.Scene {
     const s = data.shift;
     const summary = GameState.summarize(s);
     const compensation = summarizeCompensation(s);
+    GameState.completeDay(s);
 
     this.cameras.main.setBackgroundColor('#07111f');
-    this.add.text(400, 42, 'AGREEMENT VS REALITY', {
+    this.add.text(400, 36, 'AGREEMENT VS REALITY', {
       fontSize: '30px', color: '#f8fafc', fontStyle: 'bold'
     }).setOrigin(.5);
-    this.add.text(400, 78, 'The same requests can produce very different days depending on the choices made.', {
+    this.add.text(400, 70, GameState.currentScenario?.title || 'Today', {
+      fontSize: '15px', color: '#60a5fa', fontStyle: 'bold'
+    }).setOrigin(.5);
+    this.add.text(400, 94, 'The same requests can produce very different days depending on the choices made.', {
       fontSize: '14px', color: '#94a3b8'
     }).setOrigin(.5);
 
     const rows = [
       ['Monthly salary', `₦${GameState.contract.monthlySalary.toLocaleString()}`],
-      ['Agreed workday', `${GameState.contract.schedule.expectedHoursPerDay}h`],
+      ['Agreed work today', `${summary.expectedWorkMinutes / 60}h`],
       ['Counted work today', fmt(summary.totalWorkMinutes)],
       ['Standby / on-call', fmt(s.standbyMinutes + s.onCallMinutes)],
       ['Extra requests received', fmt(summary.requestedAdditionalMinutes)],
@@ -55,19 +59,19 @@ export class ResultScene extends Phaser.Scene {
     ];
 
     rows.forEach((row, i) => {
-      const y = 108 + i * 25;
+      const y = 122 + i * 24;
       this.add.text(160, y, row[0], { fontSize: '14px', color: '#94a3b8' });
       this.add.text(640, y, row[1], { fontSize: '14px', color: '#f8fafc', fontStyle: 'bold' }).setOrigin(1, 0);
     });
 
-    this.add.text(400, 454,
+    this.add.text(400, 456,
       decisionPattern(summary, s),
       { fontSize: '16px', color: '#cbd5e1', align: 'center', wordWrap: { width: 650 }, lineSpacing: 6 }
     ).setOrigin(.5);
 
-    this.add.text(400, 550, 'EXPERIENCE ANOTHER DAY', {
+    this.add.text(400, 550, 'HAVE THE CONVERSATION', {
       fontSize: '17px', color: '#fff', backgroundColor: '#16a34a', padding: { x: 24, y: 12 }
     }).setOrigin(.5).setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.scene.start('GameScene'));
+      .on('pointerdown', () => this.scene.start('DebriefScene', { shift: s }));
   }
 }

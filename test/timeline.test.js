@@ -9,6 +9,7 @@ import {
 } from '../src/game/TimelineEngine.js';
 import { summarizeCompensation } from '../src/game/economy/WageEngine.js';
 import { LIVE_IN_EVENTS } from '../src/data/tasks.js';
+import { SCENARIOS, getScenario, selectScenarioEvents } from '../src/data/scenarios.js';
 
 const events = [
   { id: 'interrupt', at: 7 * 60, title: 'Interruption', body: '', minutes: 20, staminaDelta: -5, additional: true, interruption: true },
@@ -156,4 +157,77 @@ test('repeated acceptance increases future boundary pressure', () => {
   assert.equal(shift.boundaryPressure, 29);
   assert.equal(shift.householdTrust, 60);
   assert.ok(GameState.wellbeing(shift) < 95);
+});
+
+test('phase 3 offers six reproducible scenario variations', () => {
+  assert.equal(SCENARIOS.length, 6);
+  const scenario = getScenario('ordinary-day');
+  const firstRun = selectScenarioEvents(scenario, 0);
+  const repeatedFirstRun = selectScenarioEvents(scenario, 0);
+  const secondRun = selectScenarioEvents(scenario, 1);
+  const baseEventIds = new Set(scenario.events.map((event) => event.id));
+  const firstVariant = firstRun.find((event) => !baseEventIds.has(event.id));
+  const secondVariant = secondRun.find((event) => !baseEventIds.has(event.id));
+
+  assert.deepEqual(firstRun, repeatedFirstRun);
+  assert.notEqual(firstVariant.id, secondVariant.id);
+  assert.equal(firstRun.length, scenario.events.length + 1);
+});
+
+test('selecting a scenario switches worker arrangement and contract', () => {
+  GameState.resetJourney();
+  const scenario = GameState.startScenario('salary-conversation');
+
+  assert.equal(scenario.profileId, 'mariam');
+  assert.equal(GameState.contract.livingArrangement, 'live_out');
+  assert.equal(GameState.contract.monthlySalary, 120000);
+  assert.equal(GameState.currentEvents.length, scenario.events.length + 1);
+});
+
+test('the interrupted day off treats every counted minute as beyond agreement', () => {
+  GameState.resetJourney();
+  GameState.startScenario('interrupted-day-off');
+  const shift = GameState.resetDay();
+  shift.activeMinutes = 90;
+
+  const summary = GameState.summarize(shift);
+
+  assert.equal(summary.expectedWorkMinutes, 0);
+  assert.equal(summary.workBeyondAgreementMinutes, 90);
+});
+
+test('finishing a day carries relationship memory forward exactly once', () => {
+  GameState.resetJourney();
+  GameState.startScenario('ordinary-day');
+  const shift = GameState.resetDay();
+  shift.householdTrust = 63;
+  shift.boundaryPressure = 41;
+  shift.negotiatedRequests = 2;
+
+  GameState.completeDay(shift);
+  GameState.completeDay(shift);
+
+  assert.equal(GameState.session.householdTrust, 63);
+  assert.equal(GameState.session.boundaryPressure, 41);
+  assert.equal(GameState.session.confidence, 49);
+  assert.equal(GameState.session.runCount, 1);
+  assert.deepEqual(GameState.session.completedScenarioIds, ['ordinary-day']);
+});
+
+test('recorded requests strengthen an evidence-led debrief', () => {
+  GameState.resetJourney();
+  GameState.startScenario('ordinary-day');
+  const shift = GameState.resetDay();
+  shift.recordedRequests = 2;
+  GameState.completeDay(shift);
+
+  const result = GameState.applyDebriefChoice('evidence', shift);
+
+  assert.equal(result.evidenceBonus, 4);
+  assert.equal(GameState.session.householdTrust, 57);
+  assert.equal(GameState.session.boundaryPressure, 4);
+  assert.equal(GameState.session.confidence, 61);
+  assert.deepEqual(GameState.session.lastDebrief, {
+    choiceId: 'evidence', scenarioId: 'ordinary-day', usedRecords: true
+  });
 });

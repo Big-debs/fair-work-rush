@@ -8,6 +8,7 @@ const initialHud = {
   wellbeing: 95,
   householdTrust: 55,
   boundaryPressure: 20,
+  confidence: 45,
   stress: 15,
   shiftHours: 0,
   earnings: 0,
@@ -80,6 +81,10 @@ export function GameContainer() {
         <div className="stat">
           <div className="label">Boundary pressure</div><div className="value">{Math.round(hud.boundaryPressure)}%</div>
           <div className="bar"><div className="fill pressure" style={{ width: `${hud.boundaryPressure}%` }} /></div>
+        </div>
+        <div className="stat">
+          <div className="label">Worker confidence</div><div className="value">{Math.round(hud.confidence)}%</div>
+          <div className="bar"><div className="fill confidence" style={{ width: `${hud.confidence}%` }} /></div>
         </div>
         <div className="stat"><div className="label">Monthly salary</div><div className="value">₦{hud.monthlySalary.toLocaleString()}</div></div>
         <div className="stat"><div className="label">Active work</div><div className="value">{hud.shiftHours.toFixed(1)}h</div></div>
