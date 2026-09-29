@@ -12,6 +12,9 @@ export const GameState = {
     return {
       clockMinutes: DAY_START,
       stamina: 100,
+      householdTrust: 55,
+      boundaryPressure: 20,
+      stress: 15,
       activeMinutes: 0,
       standbyMinutes: 0,
       personalMinutes: 0,
@@ -21,6 +24,11 @@ export const GameState = {
       interruptionCount: 0,
       oneMoreThings: 0,
       tasksCompleted: 0,
+      decisions: [],
+      acceptedRequests: 0,
+      negotiatedRequests: 0,
+      declinedRequests: 0,
+      recordedRequests: 0,
       events: [],
       lastEvent: null,
       ended: false
@@ -31,6 +39,12 @@ export const GameState = {
     const c = this.contract;
     const expectedMonthlyHours = c.schedule.expectedHoursPerDay * 26;
     return c.monthlySalary / expectedMonthlyHours;
+  },
+
+  wellbeing(day) {
+    return Math.round(Math.max(0, Math.min(100,
+      day.stamina * 0.65 + (100 - day.stress) * 0.35
+    )));
   },
 
   summarize(day) {
@@ -45,6 +59,13 @@ export const GameState = {
       totalWorkMinutes,
       requestedAdditionalMinutes: day.additionalMinutes,
       workBeyondAgreementMinutes: Math.max(0, totalWorkMinutes - expected),
+      wellbeing: this.wellbeing(day),
+      decisionCounts: {
+        accepted: day.acceptedRequests,
+        negotiated: day.negotiatedRequests,
+        declined: day.declinedRequests,
+        recorded: day.recordedRequests
+      },
       effectiveRate: totalWorkMinutes > 0
         ? this.contract.monthlySalary / (26 * (totalWorkMinutes / 60))
         : 0

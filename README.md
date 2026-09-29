@@ -31,3 +31,21 @@ npm run build
 - The analytical effective rate includes active, standby, and on-call time. It
   is an explanatory comparison, not a conversion of the monthly contract into
   an hourly employment agreement.
+
+## Phase 2 gameplay loop
+
+Scheduled requests now pause the current activity and ask the player to choose
+how to respond:
+
+- **Do it now** protects household trust but raises stress and makes later
+  requests more likely to expand.
+- **Negotiate the timing** reduces the immediate workload and boundary pressure
+  while introducing some tension.
+- **Set a boundary** protects the worker's time but carries the largest
+  short-term trust cost.
+- **Accept and record it** completes the request and creates a record for a
+  later conversation.
+
+The HUD tracks worker wellbeing, household trust, and boundary pressure. The
+results screen compares the agreement with the actual day and explains the
+pattern created by the player's decisions.

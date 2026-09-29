@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GameState } from '../src/game/GameState.js';
-import { DAY_END, advanceTimeline } from '../src/game/TimelineEngine.js';
+import {
+  DAY_END,
+  advanceTimeline,
+  advanceUntilDecision,
+  resolveEventDecision
+} from '../src/game/TimelineEngine.js';
 import { summarizeCompensation } from '../src/game/economy/WageEngine.js';
 import { LIVE_IN_EVENTS } from '../src/data/tasks.js';
 
@@ -96,6 +101,59 @@ test('a complete day processes every scenario event before results', () => {
   assert.equal(result.ended, true);
   assert.equal(shift.clockMinutes, DAY_END);
   assert.deepEqual(shift.events, LIVE_IN_EVENTS.map((event) => event.id));
-  assert.equal(shift.onCallMinutes, 20);
+  assert.equal(shift.onCallMinutes, 22);
   assert.equal(shift.oneMoreThings, 4);
+  assert.ok(shift.decisions.at(-1).workedMinutes > shift.decisions.at(-1).requestedMinutes);
+});
+
+test('interactive progression pauses at the exact request time', () => {
+  const shift = GameState.resetDay();
+  const result = advanceUntilDecision(shift, 120, 'personal', events);
+
+  assert.equal(shift.clockMinutes, 420);
+  assert.equal(shift.personalMinutes, 90);
+  assert.equal(result.pendingEvent.id, 'interrupt');
+  assert.equal(result.uncompletedMinutes, 30);
+  assert.deepEqual(shift.events, []);
+});
+
+test('declining protects time and lowers boundary pressure with a trust cost', () => {
+  const shift = GameState.resetDay();
+  shift.clockMinutes = 420;
+
+  const outcome = resolveEventDecision(shift, events[0], 'decline');
+
+  assert.equal(outcome.actualMinutes, 0);
+  assert.equal(shift.activeMinutes, 0);
+  assert.equal(shift.clockMinutes, 420);
+  assert.equal(shift.boundaryPressure, 11);
+  assert.equal(shift.householdTrust, 47);
+  assert.equal(shift.declinedRequests, 1);
+  assert.equal(shift.additionalMinutes, 20);
+});
+
+test('negotiation reduces the request duration and records the decision', () => {
+  const shift = GameState.resetDay();
+  shift.clockMinutes = 420;
+
+  const outcome = resolveEventDecision(shift, events[0], 'negotiate');
+
+  assert.equal(outcome.actualMinutes, 12);
+  assert.equal(shift.activeMinutes, 12);
+  assert.equal(shift.negotiatedRequests, 1);
+  assert.equal(shift.decisions[0].decisionId, 'negotiate');
+  assert.equal(shift.decisions[0].requestedMinutes, 20);
+  assert.equal(shift.decisions[0].workedMinutes, 12);
+});
+
+test('repeated acceptance increases future boundary pressure', () => {
+  const shift = GameState.resetDay();
+  shift.clockMinutes = 420;
+
+  resolveEventDecision(shift, events[0], 'accept');
+
+  assert.equal(shift.acceptedRequests, 1);
+  assert.equal(shift.boundaryPressure, 29);
+  assert.equal(shift.householdTrust, 60);
+  assert.ok(GameState.wellbeing(shift) < 95);
 });

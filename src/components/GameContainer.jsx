@@ -5,6 +5,10 @@ import { createGameConfig } from '../game/config';
 
 const initialHud = {
   stamina: 100,
+  wellbeing: 95,
+  householdTrust: 55,
+  boundaryPressure: 20,
+  stress: 15,
   shiftHours: 0,
   earnings: 0,
   reputation: 100,
@@ -62,8 +66,20 @@ export function GameContainer() {
       <div className="hud">
         <div className="stat"><div className="label">Household clock</div><div className="value">{hud.clock}</div></div>
         <div className="stat">
-          <div className="label">Stamina</div><div className="value">{Math.round(hud.stamina)}%</div>
-          <div className="bar"><div className="fill" style={{ width: `${hud.stamina}%` }} /></div>
+          <div className="label">Energy</div><div className="value">{Math.round(hud.stamina)}%</div>
+          <div className="bar"><div className="fill energy" style={{ width: `${hud.stamina}%` }} /></div>
+        </div>
+        <div className="stat">
+          <div className="label">Wellbeing · stress {Math.round(hud.stress)}%</div><div className="value">{hud.wellbeing}%</div>
+          <div className="bar"><div className="fill wellbeing" style={{ width: `${hud.wellbeing}%` }} /></div>
+        </div>
+        <div className="stat">
+          <div className="label">Household trust</div><div className="value">{Math.round(hud.householdTrust)}%</div>
+          <div className="bar"><div className="fill trust" style={{ width: `${hud.householdTrust}%` }} /></div>
+        </div>
+        <div className="stat">
+          <div className="label">Boundary pressure</div><div className="value">{Math.round(hud.boundaryPressure)}%</div>
+          <div className="bar"><div className="fill pressure" style={{ width: `${hud.boundaryPressure}%` }} /></div>
         </div>
         <div className="stat"><div className="label">Monthly salary</div><div className="value">₦{hud.monthlySalary.toLocaleString()}</div></div>
         <div className="stat"><div className="label">Active work</div><div className="value">{hud.shiftHours.toFixed(1)}h</div></div>
