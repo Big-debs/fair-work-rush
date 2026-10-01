@@ -82,3 +82,14 @@ household experience that remains legible on small phones:
   desktop canvas, with single-column decisions and minimum 44px DOM controls.
 - Players can enlarge interface text and enable calm motion. System-level
   reduced-motion preferences are respected automatically.
+
+### Realistic daily task rotation
+
+The action cards are no longer a fixed breakfast/cleaning/laundry loop. A
+39-task catalog rotates with the household clock: school preparation and runs,
+infant care, dishes, bedrooms and bathrooms, market errands, lunch, snacks,
+school pickup, homework, ironing, dinner service, children’s bedtime, kitchen
+close, and preparation for the next day. Scenario-specific work adds visitor
+hospitality, sick-child monitoring and medicine, live-out errands, and personal
+activities on an agreed day off. Completed one-time work rotates out while
+genuinely repeatable care and recovery can return.

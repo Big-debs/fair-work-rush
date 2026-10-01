@@ -69,7 +69,9 @@ export const GameState = {
   resetDay() {
     return {
       scenarioId: this.currentScenario?.id || null,
-      clockMinutes: DAY_START,
+      clockMinutes: this.contract.livingArrangement === 'live_out'
+        ? this.contract.boundaries.normalStart * 60
+        : DAY_START,
       stamina: 100,
       householdTrust: this.session.householdTrust,
       boundaryPressure: this.session.boundaryPressure,
@@ -84,6 +86,8 @@ export const GameState = {
       interruptionCount: 0,
       oneMoreThings: 0,
       tasksCompleted: 0,
+      completedTaskIds: [],
+      lastTaskCompletionMinutes: {},
       decisions: [],
       acceptedRequests: 0,
       negotiatedRequests: 0,

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { GameState } from '../GameState.js';
-import { TASKS } from '../../data/tasks.js';
+import { getAvailableTasks } from '../../data/tasks.js';
 import { getWorkerProfile } from '../../data/scenarios.js';
 import { getDecisionOptions } from '../DecisionModel.js';
 import { advanceUntilDecision, resolveEventDecision } from '../TimelineEngine.js';
@@ -54,7 +54,7 @@ export class GameScene extends Phaser.Scene {
 
     this.game.events.emit('RESET_ACTIVITY_LOG');
     this.log(`${this.profile.name} begins: ${this.scenario.title}.`, 'neutral');
-    this.emit(`${this.profile.name}'s day starts at 5:30 AM.`);
+    this.emit(`${this.profile.name}'s day starts at ${clockLabel(this.shift.clockMinutes)}.`);
 
     this.game.events.on('ACCESSIBILITY_SETTINGS', this.applyAccessibilitySettings, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -92,25 +92,39 @@ export class GameScene extends Phaser.Scene {
 
   createTaskCards() {
     this.taskButtons = [];
-    this.add.text(this.compact ? 16 : 24, this.compact ? 342 : 381, 'WHAT DO YOU DO NEXT?', {
+    this.taskHeading = this.add.text(this.compact ? 16 : 24, this.compact ? 342 : 381, 'WHAT NEEDS ATTENTION NOW?', {
       fontSize: this.compact ? '10px' : '11px', color: '#6e675f', fontStyle: 'bold'
     });
+    this.renderTaskCards();
+  }
 
-    TASKS.forEach((task, index) => {
+  renderTaskCards() {
+    this.taskButtons.forEach((card) => card.destroy(true));
+    this.taskButtons = [];
+    const tasks = getAvailableTasks(
+      this.scenario.id,
+      this.shift.clockMinutes,
+      this.shift.completedTaskIds,
+      6,
+      this.shift.lastTaskCompletionMinutes
+    );
+    this.taskHeading.setText(`WHAT NEEDS ATTENTION NOW? · ${clockLabel(this.shift.clockMinutes)}`);
+
+    tasks.forEach((task, index) => {
       let x;
       let y;
       let cardWidth;
       let cardHeight;
       if (this.compact) {
-        x = index === 4 ? this.width / 2 : (index % 2 ? this.width - 101 : 101);
+        x = index % 2 ? this.width - 101 : 101;
         y = 392 + Math.floor(index / 2) * 82;
-        cardWidth = index === 4 ? 178 : 170;
+        cardWidth = 170;
         cardHeight = 68;
       } else {
-        x = 84 + index * 158;
-        y = 436;
-        cardWidth = 142;
-        cardHeight = 82;
+        x = 138 + (index % 3) * 262;
+        y = 420 + Math.floor(index / 3) * 70;
+        cardWidth = 238;
+        cardHeight = 58;
       }
 
       const background = this.add.rectangle(0, 0, cardWidth, cardHeight, 0xfffaf1)
@@ -119,7 +133,7 @@ export class GameScene extends Phaser.Scene {
       const context = this.add.text(-cardWidth / 2 + 10, -cardHeight / 2 + 8, task.context, {
         fontSize: '9px', color: '#756e65', fontStyle: 'bold'
       });
-      const title = this.add.text(-cardWidth / 2 + 10, this.compact ? -7 : -10, task.shortName, {
+      const title = this.add.text(-cardWidth / 2 + 10, this.compact ? -7 : -6, task.shortName, {
         fontSize: this.compact ? '14px' : '15px', color: '#172238', fontStyle: 'bold'
       });
       const duration = this.add.text(cardWidth / 2 - 10, cardHeight / 2 - 9, durationLabel(task.minutes), {
@@ -140,9 +154,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   createEventPanel() {
-    const y = this.compact ? 674 : 545;
+    const y = this.compact ? 674 : 555;
     const width = this.width - (this.compact ? 24 : 48);
-    const height = this.compact ? 72 : 78;
+    const height = this.compact ? 72 : 70;
     this.eventPanel = this.add.rectangle(this.width / 2, y, width, height, 0xe6d5c0)
       .setStrokeStyle(1, 0xbda990);
     this.eventTitle = this.add.text(this.compact ? 24 : 42, y - 24, 'THE HOUSEHOLD IS QUIET', {
@@ -206,7 +220,7 @@ export class GameScene extends Phaser.Scene {
       activity: task.type === 'personal' ? 'personal' : task.type,
       remainingMinutes: task.minutes
     };
-    this.log(`${task.name} started.`, task.type === 'work' ? 'neutral' : 'positive');
+    this.log(`${task.name} started.`, ['personal', 'sleep'].includes(task.type) ? 'positive' : 'neutral');
     this.continueAction();
   }
 
@@ -226,16 +240,19 @@ export class GameScene extends Phaser.Scene {
     const { task } = this.currentAction;
     this.shift.stamina = Phaser.Math.Clamp(this.shift.stamina + task.staminaDelta, 0, 100);
     if (task.type === 'work') this.shift.stress = Phaser.Math.Clamp(this.shift.stress + 2, 0, 100);
+    if (task.type === 'standby') this.shift.stress = Phaser.Math.Clamp(this.shift.stress + 1, 0, 100);
     if (task.type === 'personal') this.shift.stress = Phaser.Math.Clamp(this.shift.stress - 6, 0, 100);
     if (task.type === 'sleep') this.shift.stress = Phaser.Math.Clamp(this.shift.stress - 18, 0, 100);
     this.shift.tasksCompleted += 1;
+    if (!this.shift.completedTaskIds.includes(task.id)) this.shift.completedTaskIds.push(task.id);
+    this.shift.lastTaskCompletionMinutes[task.id] = this.shift.clockMinutes;
     this.shift.lastEvent = task.name;
     this.currentAction = null;
     this.actionLocked = false;
-    this.setTaskCardsEnabled(true);
+    this.renderTaskCards();
     this.eventTitle.setText(`${task.context} · COMPLETED`);
     this.eventBody.setText(`${task.name} finished. The day moved forward by ${durationLabel(task.minutes)}.`);
-    this.log(`${task.name} completed.`, task.type === 'work' ? 'neutral' : 'positive');
+    this.log(`${task.name} completed.`, ['personal', 'sleep'].includes(task.type) ? 'positive' : 'neutral');
     this.updateDisplay();
     this.emit(`${task.name} completed.`);
   }

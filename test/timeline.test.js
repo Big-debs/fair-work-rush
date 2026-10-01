@@ -8,7 +8,7 @@ import {
   resolveEventDecision
 } from '../src/game/TimelineEngine.js';
 import { summarizeCompensation } from '../src/game/economy/WageEngine.js';
-import { LIVE_IN_EVENTS } from '../src/data/tasks.js';
+import { LIVE_IN_EVENTS, TASKS, getAvailableTasks } from '../src/data/tasks.js';
 import { SCENARIOS, getScenario, selectScenarioEvents } from '../src/data/scenarios.js';
 import { getGameDimensions, getTimelineModel } from '../src/game/LayoutModel.js';
 
@@ -256,4 +256,70 @@ test('timeline values stay within visible bounds', () => {
   assert.equal(timeline.expectedPercent, 0);
   assert.equal(timeline.actualPercent, 100);
   assert.equal(timeline.elapsedPercent, 100);
+});
+
+test('the daily task catalog represents domestic work beyond three chores', () => {
+  const taskIds = new Set(TASKS.map((task) => task.id));
+
+  assert.ok(TASKS.length >= 35);
+  for (const expectedId of [
+    'school-run', 'market-run', 'lunch-prep', 'snack-prep', 'diaper-change',
+    'school-pickup', 'homework-help', 'dinner-prep', 'child-bedtime', 'kitchen-close'
+  ]) {
+    assert.ok(taskIds.has(expectedId), `missing ${expectedId}`);
+  }
+});
+
+test('ordinary-day task cards rotate with the time of day', () => {
+  const morning = getAvailableTasks('ordinary-day', 5 * 60 + 30).map((task) => task.id);
+  const midday = getAvailableTasks('ordinary-day', 12 * 60).map((task) => task.id);
+  const evening = getAvailableTasks('ordinary-day', 18 * 60).map((task) => task.id);
+
+  assert.ok(morning.includes('breakfast'));
+  assert.ok(morning.includes('diaper-change'));
+  assert.ok(!morning.includes('school-run'));
+  assert.ok(getAvailableTasks('ordinary-day', 7 * 60).some((task) => task.id === 'school-run'));
+  assert.ok(midday.includes('market-run'));
+  assert.ok(midday.includes('lunch-prep'));
+  assert.ok(evening.includes('dinner-prep'));
+  assert.ok(evening.includes('child-bedtime'));
+  assert.notDeepEqual(morning, midday);
+  assert.notDeepEqual(midday, evening);
+});
+
+test('scenario task sets reflect care, hospitality, and protected time off', () => {
+  const sickDay = getAvailableTasks('sick-child', 10 * 60).map((task) => task.id);
+  const visitors = getAvailableTasks('unexpected-visitors', 17 * 60).map((task) => task.id);
+  const dayOff = getAvailableTasks('interrupted-day-off', 10 * 60);
+
+  assert.ok(sickDay.includes('temperature-check'));
+  assert.ok(sickDay.includes('give-medicine'));
+  assert.ok(visitors.includes('serve-visitors'));
+  assert.ok(dayOff.every((task) => task.type === 'personal'));
+});
+
+test('completed one-time work rotates out while repeatable care remains', () => {
+  const tasks = getAvailableTasks('ordinary-day', 8 * 60, ['breakfast', 'diaper-change'], 20);
+  const ids = tasks.map((task) => task.id);
+
+  assert.ok(!ids.includes('breakfast'));
+  assert.ok(ids.includes('diaper-change'));
+});
+
+test('repeatable care respects time between medicine and changes', () => {
+  const lastCompleted = { 'give-medicine': 9 * 60, 'diaper-change': 9 * 60 };
+  const soon = getAvailableTasks('sick-child', 10 * 60, [], 20, lastCompleted).map((task) => task.id);
+  const later = getAvailableTasks('sick-child', 13 * 60, [], 20, lastCompleted).map((task) => task.id);
+
+  assert.ok(!soon.includes('give-medicine'));
+  assert.ok(!soon.includes('diaper-change'));
+  assert.ok(later.includes('give-medicine'));
+  assert.ok(later.includes('diaper-change'));
+});
+
+test('live-out scenarios begin at the contracted start time', () => {
+  GameState.resetJourney();
+  GameState.startScenario('salary-conversation');
+
+  assert.equal(GameState.resetDay().clockMinutes, 8 * 60);
 });
