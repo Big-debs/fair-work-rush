@@ -11,6 +11,7 @@ import { summarizeCompensation } from '../src/game/economy/WageEngine.js';
 import { LIVE_IN_EVENTS, TASKS, getAvailableTasks } from '../src/data/tasks.js';
 import { SCENARIOS, getScenario, selectScenarioEvents } from '../src/data/scenarios.js';
 import { getGameDimensions, getTimelineModel } from '../src/game/LayoutModel.js';
+import { getActivityDefinition, getActivityStepMinutes } from '../src/data/activities.js';
 
 const events = [
   { id: 'interrupt', at: 7 * 60, title: 'Interruption', body: '', minutes: 20, staminaDelta: -5, additional: true, interruption: true },
@@ -322,4 +323,49 @@ test('live-out scenarios begin at the contracted start time', () => {
   GameState.startScenario('salary-conversation');
 
   assert.equal(GameState.resetDay().clockMinutes, 8 * 60);
+});
+
+test('phase 5 gives every daily task a reusable interactive activity', () => {
+  for (const task of TASKS) {
+    const activity = getActivityDefinition(task);
+
+    assert.equal(activity.taskId, task.id);
+    assert.ok(activity.familyId);
+    assert.ok(activity.steps.length >= 3, `${task.id} needs at least three physical steps`);
+    assert.equal(new Set(activity.steps.map((step) => step.id)).size, activity.steps.length);
+  }
+});
+
+test('flagship activities use distinct realistic sequences', () => {
+  const breakfast = getActivityDefinition(TASKS.find((task) => task.id === 'breakfast'));
+  const market = getActivityDefinition(TASKS.find((task) => task.id === 'market-run'));
+  const diaper = getActivityDefinition(TASKS.find((task) => task.id === 'diaper-change'));
+
+  assert.equal(breakfast.familyId, 'preparation');
+  assert.deepEqual(breakfast.steps.map((step) => step.object), ['sink', 'bowl', 'pot', 'plate']);
+  assert.equal(market.familyId, 'shopping');
+  assert.deepEqual(market.steps.map((step) => step.object), ['list', 'stall', 'coins', 'bag']);
+  assert.equal(diaper.familyId, 'care');
+  assert.deepEqual(diaper.steps.map((step) => step.object), ['sink', 'care-bag', 'care-mat', 'cot']);
+});
+
+test('interactive steps consume exactly the task duration', () => {
+  for (const task of TASKS) {
+    const activity = getActivityDefinition(task);
+    const minutes = activity.steps.map((_, index) => (
+      getActivityStepMinutes(task.minutes, activity.steps.length, index)
+    ));
+
+    assert.equal(minutes.reduce((total, value) => total + value, 0), task.minutes);
+    assert.ok(minutes.every((value) => value >= 0));
+  }
+});
+
+test('day state records completed and unfinished physical work', () => {
+  const shift = GameState.resetDay();
+
+  assert.deepEqual(shift.worldState, {});
+  shift.worldState.breakfast = { status: 'unfinished', remainingMinutes: 20 };
+  shift.worldState.breakfast = { status: 'complete', remainingMinutes: 0 };
+  assert.equal(shift.worldState.breakfast.status, 'complete');
 });

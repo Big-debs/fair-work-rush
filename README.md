@@ -93,3 +93,25 @@ close, and preparation for the next day. Scenario-specific work adds visitor
 hospitality, sick-child monitoring and medicine, live-out errands, and personal
 activities on an agreed day off. Completed one-time work rotates out while
 genuinely repeatable care and recovery can return.
+
+## Phase 5 interactive activity layer
+
+Phase 5 turns timeline choices into short, tactile browser-game sequences while
+keeping the labour simulation authoritative:
+
+- Three.js is loaded only when an interactive activity opens, so the main
+  Phaser scene remains the source of truth for time, tasks, requests, and
+  consequences.
+- Breakfast preparation, a market run, and diaper care have bespoke low-poly
+  object sequences. Every other task is covered by one of nine reusable
+  activity families spanning preparation, care, transport, shopping,
+  supervision, hospitality, cleaning, sorting, and recovery.
+- Each physical step consumes its share of the task duration. A scheduled
+  request can interrupt the exact step in progress; after the player responds,
+  the same scene and progress resume.
+- Completed and unfinished work is recorded in world state. Players may leave
+  a task unfinished, continue without WebGL, or disable 3D activities entirely
+  while retaining the full timeline simulation.
+- The fixed-camera scenes use simple geometry, capped pixel density, reusable
+  materials, touch-sized controls, keyboard-operable DOM alternatives, and a
+  reduced-motion path for practical browser and mobile performance.

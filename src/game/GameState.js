@@ -88,6 +88,7 @@ export const GameState = {
       tasksCompleted: 0,
       completedTaskIds: [],
       lastTaskCompletionMinutes: {},
+      worldState: {},
       decisions: [],
       acceptedRequests: 0,
       negotiatedRequests: 0,

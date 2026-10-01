@@ -1,9 +1,19 @@
 {
-  "name":"fair-work-rush",
-  "private":true,
-  "version":"0.5.1",
-  "type":"module",
-  "scripts":{"dev":"vite","build":"vite build","preview":"vite preview","test":"node --test"},
-  "dependencies":{"phaser":"^3.90.0","react":"^19.1.1","react-dom":"^19.1.1","vite":"^7.1.0"},
-  "devDependencies":{}
+  "name": "fair-work-rush",
+  "private": true,
+  "version": "0.6.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "three": "^0.180.0",
+    "vite": "^7.1.0"
+  }
 }

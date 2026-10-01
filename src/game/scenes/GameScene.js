@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GameState } from '../GameState.js';
 import { getAvailableTasks } from '../../data/tasks.js';
+import { getActivityDefinition, getActivityStepMinutes } from '../../data/activities.js';
 import { getWorkerProfile } from '../../data/scenarios.js';
 import { getDecisionOptions } from '../DecisionModel.js';
 import { advanceUntilDecision, resolveEventDecision } from '../TimelineEngine.js';
@@ -57,8 +58,16 @@ export class GameScene extends Phaser.Scene {
     this.emit(`${this.profile.name}'s day starts at ${clockLabel(this.shift.clockMinutes)}.`);
 
     this.game.events.on('ACCESSIBILITY_SETTINGS', this.applyAccessibilitySettings, this);
+    this.game.events.on('THREE_ACTIVITY_STEP', this.handleActivityStep, this);
+    this.game.events.on('THREE_ACTIVITY_FINISH', this.handleActivityFinish, this);
+    this.game.events.on('THREE_ACTIVITY_ABANDON', this.handleActivityAbandon, this);
+    this.game.events.on('THREE_ACTIVITY_FALLBACK', this.handleActivityFallback, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off('ACCESSIBILITY_SETTINGS', this.applyAccessibilitySettings, this);
+      this.game.events.off('THREE_ACTIVITY_STEP', this.handleActivityStep, this);
+      this.game.events.off('THREE_ACTIVITY_FINISH', this.handleActivityFinish, this);
+      this.game.events.off('THREE_ACTIVITY_ABANDON', this.handleActivityAbandon, this);
+      this.game.events.off('THREE_ACTIVITY_FALLBACK', this.handleActivityFallback, this);
     });
   }
 
@@ -208,20 +217,47 @@ export class GameScene extends Phaser.Scene {
 
   executeTask(task) {
     if (this.actionLocked) return;
-    if (this.shift.stamina + task.staminaDelta < 0) {
+    const savedProgress = this.shift.worldState[task.id]?.status === 'unfinished'
+      ? this.shift.worldState[task.id]
+      : null;
+    const remainingStaminaDelta = task.staminaDelta - (savedProgress?.staminaApplied ?? 0);
+    if (this.shift.stamina + remainingStaminaDelta < 0) {
       this.flash('Too tired. Choose recovery before taking more work.');
       return;
     }
 
     this.actionLocked = true;
     this.setTaskCardsEnabled(false);
+    const definition = getActivityDefinition(task);
+    const interactive = Boolean(this.registry.get('interactiveActivities')) && Boolean(definition);
+    const sessionId = interactive
+      ? `${task.id}-${this.shift.clockMinutes}-${Math.round(this.time.now)}`
+      : null;
     this.currentAction = {
       task,
       activity: task.type === 'personal' ? 'personal' : task.type,
-      remainingMinutes: task.minutes
+      remainingMinutes: savedProgress?.remainingMinutes ?? task.minutes,
+      interactive,
+      sessionId,
+      definition,
+      acknowledgedStep: savedProgress?.acknowledgedStep ?? -1,
+      pendingStepIndex: null,
+      pendingStepMinutes: 0,
+      staminaApplied: savedProgress?.staminaApplied ?? 0,
+      stressApplied: savedProgress?.stressApplied ?? 0
     };
     this.log(`${task.name} started.`, ['personal', 'sleep'].includes(task.type) ? 'positive' : 'neutral');
-    this.continueAction();
+    if (interactive) {
+      this.game.events.emit('OPEN_3D_ACTIVITY', {
+        sessionId,
+        task,
+        definition,
+        acknowledgedStep: this.currentAction.acknowledgedStep
+      });
+      this.emit(`${task.name}: complete each physical step. Requests may still interrupt you.`);
+    } else {
+      this.continueAction();
+    }
   }
 
   continueAction() {
@@ -236,16 +272,135 @@ export class GameScene extends Phaser.Scene {
     else this.completeAction();
   }
 
+  handleActivityStep({ sessionId, stepIndex } = {}) {
+    const action = this.currentAction;
+    if (!action?.interactive || action.sessionId !== sessionId || action.pendingStepIndex !== null) return;
+    if (stepIndex !== action.acknowledgedStep + 1 || stepIndex >= action.definition.steps.length) return;
+
+    action.pendingStepIndex = stepIndex;
+    action.pendingStepMinutes = getActivityStepMinutes(
+      action.task.minutes,
+      action.definition.steps.length,
+      stepIndex
+    );
+    this.advanceInteractiveStep();
+  }
+
+  advanceInteractiveStep() {
+    const action = this.currentAction;
+    if (!action?.interactive || action.pendingStepIndex === null) return;
+
+    const result = advanceUntilDecision(
+      this.shift,
+      action.pendingStepMinutes,
+      action.activity,
+      GameState.currentEvents
+    );
+    action.pendingStepMinutes = result.uncompletedMinutes;
+    action.remainingMinutes = Math.max(0, action.remainingMinutes - result.completedMinutes);
+    this.updateDisplay();
+
+    if (result.pendingEvent) {
+      this.game.events.emit('PAUSE_3D_ACTIVITY', { sessionId: action.sessionId });
+      this.showDecision(result.pendingEvent);
+      return;
+    }
+    if (result.ended) {
+      this.game.events.emit('CLOSE_3D_ACTIVITY', { sessionId: action.sessionId });
+      this.endDay();
+      return;
+    }
+
+    action.acknowledgedStep = action.pendingStepIndex;
+    action.pendingStepIndex = null;
+    action.pendingStepMinutes = 0;
+    this.game.events.emit('ACK_3D_ACTIVITY_STEP', {
+      sessionId: action.sessionId,
+      stepIndex: action.acknowledgedStep
+    });
+    this.emit(`${action.task.name}: step ${action.acknowledgedStep + 1} of ${action.definition.steps.length} complete.`);
+  }
+
+  handleActivityFinish({ sessionId } = {}) {
+    const action = this.currentAction;
+    if (!action?.interactive || action.sessionId !== sessionId) return;
+    if (action.acknowledgedStep !== action.definition.steps.length - 1 || action.remainingMinutes > 0) return;
+    this.game.events.emit('CLOSE_3D_ACTIVITY', { sessionId });
+    this.completeAction();
+  }
+
+  handleActivityAbandon({ sessionId } = {}) {
+    const action = this.currentAction;
+    if (!action?.interactive || action.sessionId !== sessionId || action.pendingStepIndex !== null) return;
+    const completedMinutes = Math.max(0, action.task.minutes - action.remainingMinutes);
+    const completionRatio = action.task.minutes > 0 ? completedMinutes / action.task.minutes : 0;
+    const staminaTarget = Math.round(action.task.staminaDelta * completionRatio);
+    const stressTarget = completedMinutes > 0 && ['work', 'standby'].includes(action.task.type) ? 1 : 0;
+    this.shift.stamina = Phaser.Math.Clamp(
+      this.shift.stamina + staminaTarget - action.staminaApplied,
+      0,
+      100
+    );
+    this.shift.stress = Phaser.Math.Clamp(this.shift.stress + stressTarget - action.stressApplied, 0, 100);
+    this.shift.worldState[action.task.id] = {
+      status: 'unfinished',
+      remainingMinutes: action.remainingMinutes,
+      acknowledgedStep: action.acknowledgedStep,
+      staminaApplied: staminaTarget,
+      stressApplied: stressTarget
+    };
+    this.shift.lastEvent = `${action.task.name} left unfinished`;
+    this.game.events.emit('CLOSE_3D_ACTIVITY', { sessionId });
+    this.log(`${action.task.name} left unfinished after ${durationLabel(completedMinutes)}.`, 'interruption');
+    this.eventTitle.setText(`${action.task.context} · UNFINISHED`);
+    this.eventBody.setText('The work already done remains counted, and the task can return later.');
+    this.currentAction = null;
+    this.actionLocked = false;
+    this.renderTaskCards();
+    this.updateDisplay();
+    this.emit(`${action.task.name} is unfinished. Choose what needs attention now.`);
+  }
+
+  handleActivityFallback({ sessionId } = {}) {
+    const action = this.currentAction;
+    if (!action?.interactive || action.sessionId !== sessionId) return;
+    if (action.pendingStepIndex !== null) {
+      action.fallbackAfterDecision = true;
+      return;
+    }
+    this.game.events.emit('CLOSE_3D_ACTIVITY', { sessionId });
+    action.interactive = false;
+    action.pendingStepIndex = null;
+    action.pendingStepMinutes = 0;
+    this.log(`${action.task.name} continued in simple mode.`, 'neutral');
+    this.emit(`${action.task.name} is continuing in simple mode.`);
+    this.continueAction();
+  }
+
   completeAction() {
-    const { task } = this.currentAction;
-    this.shift.stamina = Phaser.Math.Clamp(this.shift.stamina + task.staminaDelta, 0, 100);
-    if (task.type === 'work') this.shift.stress = Phaser.Math.Clamp(this.shift.stress + 2, 0, 100);
-    if (task.type === 'standby') this.shift.stress = Phaser.Math.Clamp(this.shift.stress + 1, 0, 100);
-    if (task.type === 'personal') this.shift.stress = Phaser.Math.Clamp(this.shift.stress - 6, 0, 100);
-    if (task.type === 'sleep') this.shift.stress = Phaser.Math.Clamp(this.shift.stress - 18, 0, 100);
+    const action = this.currentAction;
+    const { task } = action;
+    const stressTarget = task.type === 'work' ? 2
+      : task.type === 'standby' ? 1
+        : task.type === 'personal' ? -6
+          : task.type === 'sleep' ? -18
+            : 0;
+    this.shift.stamina = Phaser.Math.Clamp(
+      this.shift.stamina + task.staminaDelta - action.staminaApplied,
+      0,
+      100
+    );
+    this.shift.stress = Phaser.Math.Clamp(this.shift.stress + stressTarget - action.stressApplied, 0, 100);
     this.shift.tasksCompleted += 1;
     if (!this.shift.completedTaskIds.includes(task.id)) this.shift.completedTaskIds.push(task.id);
     this.shift.lastTaskCompletionMinutes[task.id] = this.shift.clockMinutes;
+    this.shift.worldState[task.id] = {
+      status: 'complete',
+      remainingMinutes: 0,
+      acknowledgedStep: (action.definition?.steps.length ?? 0) - 1,
+      staminaApplied: task.staminaDelta,
+      stressApplied: stressTarget
+    };
     this.shift.lastEvent = task.name;
     this.currentAction = null;
     this.actionLocked = false;
@@ -320,7 +475,17 @@ export class GameScene extends Phaser.Scene {
 
     this.time.delayedCall(this.reducedMotion ? 0 : 550, () => {
       if (this.shift.clockMinutes >= 29 * 60 + 30) this.endDay();
-      else this.continueAction();
+      else if (this.currentAction?.fallbackAfterDecision) {
+        this.currentAction.fallbackAfterDecision = false;
+        this.currentAction.pendingStepIndex = null;
+        this.currentAction.pendingStepMinutes = 0;
+        this.handleActivityFallback({ sessionId: this.currentAction.sessionId });
+      }
+      else if (this.currentAction?.interactive && this.currentAction.pendingStepIndex !== null) {
+        this.advanceInteractiveStep();
+      } else {
+        this.continueAction();
+      }
     });
   }
 
@@ -381,6 +546,9 @@ export class GameScene extends Phaser.Scene {
 
   endDay() {
     if (this.shift.ended) return;
+    if (this.currentAction?.sessionId) {
+      this.game.events.emit('CLOSE_3D_ACTIVITY', { sessionId: this.currentAction.sessionId });
+    }
     this.shift.ended = true;
     this.scene.start('ResultScene', { shift: this.shift });
   }

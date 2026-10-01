@@ -1,8 +1,30 @@
-import React from 'react';
-import { useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import Phaser from 'phaser';
 import { createGameConfig } from '../game/config';
 import { getTimelineModel } from '../game/LayoutModel.js';
+
+const ThreeActivity = lazy(() => import('./activities/ThreeActivity.jsx'));
+
+class ActivityErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="activity-loading activity-failed" role="alert">
+        <strong>The interactive scene could not load.</strong>
+        <button type="button" onClick={this.props.onFallback}>Continue in simple mode</button>
+      </div>
+    );
+  }
+}
 
 const initialHud = {
   stamina: 100,
@@ -82,6 +104,8 @@ export function GameContainer() {
   const [error, setError] = useState('');
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [largeText, setLargeText] = useState(false);
+  const [interactiveMode, setInteractiveMode] = useState(true);
+  const [threeActivity, setThreeActivity] = useState(null);
   const [reducedMotion, setReducedMotion] = useState(() => (
     typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   ));
@@ -96,6 +120,7 @@ export function GameContainer() {
       const game = new Phaser.Game(createGameConfig(root));
       gameRef.current = game;
       game.registry.set('reducedMotion', reducedMotion);
+      game.registry.set('interactiveActivities', interactiveMode);
 
       const updateHud = (data) => {
         if (!disposed) setHud((previous) => ({ ...previous, ...data }));
@@ -113,10 +138,33 @@ export function GameContainer() {
       const resetActivity = () => {
         if (!disposed) setActivity([]);
       };
+      const openThreeActivity = (payload) => {
+        if (!disposed) setThreeActivity({ ...payload, acknowledgedStep: payload.acknowledgedStep ?? -1, visible: true });
+      };
+      const pauseThreeActivity = ({ sessionId } = {}) => {
+        if (disposed) return;
+        setThreeActivity((previous) => previous?.sessionId === sessionId
+          ? { ...previous, visible: false }
+          : previous);
+      };
+      const acknowledgeThreeActivity = ({ sessionId, stepIndex } = {}) => {
+        if (disposed) return;
+        setThreeActivity((previous) => previous?.sessionId === sessionId
+          ? { ...previous, acknowledgedStep: stepIndex, visible: true }
+          : previous);
+      };
+      const closeThreeActivity = ({ sessionId } = {}) => {
+        if (disposed) return;
+        setThreeActivity((previous) => !sessionId || previous?.sessionId === sessionId ? null : previous);
+      };
 
       game.events.on('UPDATE_HUD', updateHud);
       game.events.on('LOG_ACTIVITY', logActivity);
       game.events.on('RESET_ACTIVITY_LOG', resetActivity);
+      game.events.on('OPEN_3D_ACTIVITY', openThreeActivity);
+      game.events.on('PAUSE_3D_ACTIVITY', pauseThreeActivity);
+      game.events.on('ACK_3D_ACTIVITY_STEP', acknowledgeThreeActivity);
+      game.events.on('CLOSE_3D_ACTIVITY', closeThreeActivity);
       game.events.once('boot', () => { if (!disposed) setError(''); });
 
       return () => {
@@ -124,6 +172,10 @@ export function GameContainer() {
         game.events.off('UPDATE_HUD', updateHud);
         game.events.off('LOG_ACTIVITY', logActivity);
         game.events.off('RESET_ACTIVITY_LOG', resetActivity);
+        game.events.off('OPEN_3D_ACTIVITY', openThreeActivity);
+        game.events.off('PAUSE_3D_ACTIVITY', pauseThreeActivity);
+        game.events.off('ACK_3D_ACTIVITY_STEP', acknowledgeThreeActivity);
+        game.events.off('CLOSE_3D_ACTIVITY', closeThreeActivity);
         if (gameRef.current === game) {
           gameRef.current = null;
           game.destroy(true);
@@ -143,6 +195,15 @@ export function GameContainer() {
     game.events.emit('ACCESSIBILITY_SETTINGS', { reducedMotion });
   }, [reducedMotion]);
 
+  useEffect(() => {
+    const game = gameRef.current;
+    if (!game) return;
+    game.registry.set('interactiveActivities', interactiveMode);
+    if (!interactiveMode && threeActivity) {
+      game.events.emit('THREE_ACTIVITY_FALLBACK', { sessionId: threeActivity.sessionId });
+    }
+  }, [interactiveMode, threeActivity]);
+
   return (
     <section className={`game-shell${largeText ? ' large-text' : ''}${reducedMotion ? ' reduced-motion' : ''}`}>
       <div className="control-bar">
@@ -150,6 +211,7 @@ export function GameContainer() {
         <div className="accessibility-controls" aria-label="Display settings">
           <button type="button" aria-pressed={largeText} onClick={() => setLargeText((value) => !value)}>Aa</button>
           <button type="button" aria-pressed={reducedMotion} onClick={() => setReducedMotion((value) => !value)}>Calm motion</button>
+          <button type="button" aria-pressed={interactiveMode} onClick={() => setInteractiveMode((value) => !value)}>3D activities</button>
         </div>
       </div>
 
@@ -177,6 +239,28 @@ export function GameContainer() {
       <div className="game-stage">
         <div className="canvas" aria-label="Fair Work Rush game">
           <div ref={rootRef} className="phaser-root" />
+          {threeActivity && (
+            <ActivityErrorBoundary
+              key={threeActivity.sessionId}
+              onFallback={() => gameRef.current?.events.emit('THREE_ACTIVITY_FALLBACK', { sessionId: threeActivity.sessionId })}
+            >
+              <Suspense fallback={<div className="activity-loading" role="status">Preparing the activity…</div>}>
+                <ThreeActivity
+                  activity={threeActivity.definition}
+                  acknowledgedStep={threeActivity.acknowledgedStep}
+                  visible={threeActivity.visible}
+                  reducedMotion={reducedMotion}
+                  onStep={(stepIndex) => gameRef.current?.events.emit('THREE_ACTIVITY_STEP', {
+                    sessionId: threeActivity.sessionId,
+                    stepIndex
+                  })}
+                  onFinish={() => gameRef.current?.events.emit('THREE_ACTIVITY_FINISH', { sessionId: threeActivity.sessionId })}
+                  onAbandon={() => gameRef.current?.events.emit('THREE_ACTIVITY_ABANDON', { sessionId: threeActivity.sessionId })}
+                  onFallback={() => gameRef.current?.events.emit('THREE_ACTIVITY_FALLBACK', { sessionId: threeActivity.sessionId })}
+                />
+              </Suspense>
+            </ActivityErrorBoundary>
+          )}
           {error && <div className="game-error"><strong>Game failed to start</strong><span>{error}</span></div>}
         </div>
         <aside className="activity-panel" aria-live="polite">
