@@ -396,5 +396,5 @@ test('breakfast asset bindings cover every authored activity step', () => {
     assert.ok(binding.requiredAnchors.length > 0);
     assert.ok(Object.keys(binding.state).length > 0);
   }
-  assert.equal(ASSET_PACKS.kitchen.status, 'specified');
+  assert.equal(ASSET_PACKS.kitchen.status, 'ready');
 });

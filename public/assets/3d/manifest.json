@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "units": "metres",
+  "files": {
+    "public/assets/3d/environments/kitchen-a.glb": 68328,
+    "public/assets/3d/props/kitchen-props-a.glb": 68804,
+    "public/assets/3d/characters/worker-a.glb": 59264
+  }
+}

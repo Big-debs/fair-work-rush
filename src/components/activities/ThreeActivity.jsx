@@ -46,6 +46,9 @@ export default function ThreeActivity({
   const reducedMotionRef = useRef(reducedMotion);
   const currentStepRef = useRef(acknowledgedStep + 1);
   const pendingRef = useRef(false);
+  const stepTimerRef = useRef(null);
+  const assetControllerRef = useRef(null);
+  const submitStepRef = useRef(null);
   const [pending, setPending] = useState(false);
   const [renderError, setRenderError] = useState('');
   const currentStep = acknowledgedStep + 1;
@@ -65,7 +68,19 @@ export default function ThreeActivity({
       mesh.material.emissive.setHex(active ? 0x3a2612 : 0x000000);
       mesh.scale.setScalar(active ? 1.12 : 1);
     });
+    assetControllerRef.current?.applyState(currentStep);
   }, [currentStep]);
+
+  submitStepRef.current = (stepIndex) => {
+    if (pendingRef.current || stepIndex >= activity.steps.length) return;
+    pendingRef.current = true;
+    setPending(true);
+    const animationDelay = reducedMotionRef.current
+      ? 0
+      : assetControllerRef.current?.playStep(stepIndex) ?? 0;
+    clearTimeout(stepTimerRef.current);
+    stepTimerRef.current = setTimeout(() => onStep(stepIndex), animationDelay);
+  };
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -73,6 +88,8 @@ export default function ThreeActivity({
     let renderer;
     let animationFrame;
     let resizeObserver;
+    let cancelled = false;
+    let previousTime = 0;
 
     try {
       const scene = new THREE.Scene();
@@ -96,19 +113,23 @@ export default function ThreeActivity({
       keyLight.castShadow = true;
       scene.add(keyLight);
 
+      const fallbackGroup = new THREE.Group();
+      fallbackGroup.name = 'primitive_fallback';
+      scene.add(fallbackGroup);
+
       const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xa87755, roughness: .9 });
       const floor = new THREE.Mesh(new THREE.PlaneGeometry(18, 10), floorMaterial);
       floor.rotation.x = -Math.PI / 2;
       floor.position.y = -.82;
       floor.receiveShadow = true;
-      scene.add(floor);
+      fallbackGroup.add(floor);
 
       const backWall = new THREE.Mesh(
         new THREE.PlaneGeometry(18, 8),
         new THREE.MeshStandardMaterial({ color: 0xe8d8bd, roughness: 1 })
       );
       backWall.position.set(0, 3, -3.2);
-      scene.add(backWall);
+      fallbackGroup.add(backWall);
 
       const rug = new THREE.Mesh(
         new THREE.CircleGeometry(4.6, 40),
@@ -117,10 +138,10 @@ export default function ThreeActivity({
       rug.rotation.x = -Math.PI / 2;
       rug.position.y = -.78;
       rug.scale.z = .42;
-      scene.add(rug);
+      fallbackGroup.add(rug);
 
       const meshes = activity.steps.map((activityStep, index) => createProp(activityStep, index, activity.steps.length));
-      meshes.forEach((mesh) => scene.add(mesh));
+      meshes.forEach((mesh) => fallbackGroup.add(mesh));
       meshesRef.current = meshes;
       meshes.forEach((mesh, index) => {
         const done = index < currentStepRef.current;
@@ -139,11 +160,10 @@ export default function ThreeActivity({
         pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
         pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
         raycaster.setFromCamera(pointer, camera);
-        const selected = raycaster.intersectObjects(meshes, false)[0]?.object;
+        const selected = raycaster.intersectObjects(meshesRef.current, false)[0]?.object;
         if (selected?.userData.stepIndex === currentStepRef.current) {
           pendingRef.current = true;
-          setPending(true);
-          onStep(currentStepRef.current);
+          submitStepRef.current?.(currentStepRef.current);
         }
       };
       renderer.domElement.addEventListener('pointerdown', selectFromPointer);
@@ -160,11 +180,44 @@ export default function ThreeActivity({
       resizeObserver.observe(mount);
       resize();
 
+      if (activity.taskId === 'breakfast') {
+        import('../../game/three/ActivitySceneLoader.js').then(({ loadBreakfastScene }) => (
+          loadBreakfastScene(scene, activity)
+        )).then((controller) => {
+          if (!controller) return;
+          if (cancelled) {
+            controller.dispose();
+            return;
+          }
+          assetControllerRef.current = controller;
+          fallbackGroup.visible = false;
+          meshesRef.current = controller.hotspots;
+          controller.applyState(currentStepRef.current);
+          const { position, target, fov } = controller.camera;
+          camera.position.set(...position);
+          camera.fov = fov;
+          camera.lookAt(...target);
+          camera.updateProjectionMatrix();
+          meshesRef.current.forEach((mesh, index) => {
+            const done = index < currentStepRef.current;
+            const active = index === currentStepRef.current;
+            mesh.material.opacity = done ? .18 : active ? .82 : .34;
+            mesh.material.emissive.setHex(active ? 0x7a421d : 0x20150d);
+            mesh.scale.setScalar(active ? 1.22 : .84);
+          });
+        }).catch((error) => {
+          console.warn('Breakfast production assets unavailable; using primitive fallback.', error);
+        });
+      }
+
       const animate = (time) => {
         animationFrame = requestAnimationFrame(animate);
         if (!visibleRef.current) return;
+        const deltaSeconds = previousTime ? Math.min(.05, (time - previousTime) / 1000) : 0;
+        previousTime = time;
+        assetControllerRef.current?.update(deltaSeconds);
         const active = meshes[currentStepRef.current];
-        if (active && !reducedMotionRef.current) {
+        if (active && !reducedMotionRef.current && fallbackGroup.visible) {
           active.rotation.y = Math.sin(time / 700) * .16;
           active.position.y = active.userData.baseY + Math.sin(time / 480) * .08;
         }
@@ -173,6 +226,8 @@ export default function ThreeActivity({
       animationFrame = requestAnimationFrame(animate);
 
       return () => {
+        cancelled = true;
+        clearTimeout(stepTimerRef.current);
         cancelAnimationFrame(animationFrame);
         resizeObserver?.disconnect();
         renderer.domElement.removeEventListener('pointerdown', selectFromPointer);
@@ -186,6 +241,8 @@ export default function ThreeActivity({
         backWall.material.dispose();
         rug.geometry.dispose();
         rug.material.dispose();
+        assetControllerRef.current?.dispose();
+        assetControllerRef.current = null;
         renderer.dispose();
         mount.replaceChildren();
       };
@@ -198,10 +255,8 @@ export default function ThreeActivity({
   }, [activity.id]);
 
   const requestCurrentStep = () => {
-    if (pendingRef.current || complete) return;
-    pendingRef.current = true;
-    setPending(true);
-    onStep(currentStep);
+    if (complete) return;
+    submitStepRef.current?.(currentStep);
   };
 
   return (

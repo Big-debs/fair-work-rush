@@ -124,3 +124,16 @@ anchor conventions and stateful-prop rules live in
 [`breakfast vertical slice`](docs/BREAKFAST_VERTICAL_SLICE.md), backed by a
 runtime-facing asset manifest while the current primitive scenes remain the
 loading and compatibility fallback.
+
+The first breakfast production prototype includes reproducible GLB files for
+the kitchen, stateful props and articulated worker. Build and validate them with:
+
+```bash
+npm run assets:build
+npm run assets:validate
+```
+
+When these files load, the breakfast activity swaps out the primitive stage,
+uses authored sink/preparation/cooker/serving hotspots, plays embedded worker
+actions and restores the visible food/serving state after interruptions. A
+failed or unsupported asset load falls back to the original lightweight scene.

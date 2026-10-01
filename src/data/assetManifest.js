@@ -4,7 +4,7 @@ export const ASSET_PACKS = {
     environmentModel: '/assets/3d/environments/kitchen-a.glb',
     propModel: '/assets/3d/props/kitchen-props-a.glb',
     camera: { position: [0, 4.8, 8.2], target: [0, 1.1, 0], fov: 40 },
-    status: 'specified'
+    status: 'ready'
   },
   market: {
     id: 'market',
@@ -67,8 +67,8 @@ export const ASSET_PACKS = {
 export const CHARACTER_ASSETS = {
   worker: {
     model: '/assets/3d/characters/worker-a.glb',
-    animations: '/assets/3d/animations/shared-actions-a.glb',
-    status: 'specified'
+    animations: 'embedded',
+    status: 'ready'
   },
   child: {
     model: '/assets/3d/characters/child-a.glb',

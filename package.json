@@ -1,9 +1,11 @@
 {
   "name": "fair-work-rush",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.6.1",
   "type": "module",
   "scripts": {
+    "assets:build": "node scripts/build-3d-assets.mjs",
+    "assets:validate": "node scripts/validate-3d-assets.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

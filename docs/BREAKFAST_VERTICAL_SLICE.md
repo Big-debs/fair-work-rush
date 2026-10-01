@@ -4,6 +4,20 @@ This is the first production asset package. It validates character scale,
 camera, lighting, object contact, state restoration and mobile performance
 before the market and infant-care kits are modelled.
 
+## Prototype asset status
+
+The repository now generates and ships the first GLB prototypes:
+
+- `public/assets/3d/environments/kitchen-a.glb`
+- `public/assets/3d/props/kitchen-props-a.glb`
+- `public/assets/3d/characters/worker-a.glb`
+
+Run `npm run assets:build` to reproduce them and `npm run assets:validate` to
+check required nodes, hotspots, state groups, animation clips, dimensions and
+prototype file budgets. The worker currently uses an articulated low-poly node
+rig with embedded clips. A Blender-authored skinned replacement can retain the
+same filenames, node names and animation names without changing gameplay code.
+
 ## Player-readable sequence
 
 | Step | Actor animation | Interactive props | Confirmed world state |
@@ -83,4 +97,3 @@ The game clock and stamina may advance only once for each confirmed step.
 - The scene reaches 30 FPS on the selected low-end Android test device.
 - Keyboard and touch players can trigger the same steps.
 - If any GLB fails, the primitive fallback continues the activity.
-
