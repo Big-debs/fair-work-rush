@@ -12,6 +12,12 @@ import { LIVE_IN_EVENTS, TASKS, getAvailableTasks } from '../src/data/tasks.js';
 import { SCENARIOS, getScenario, selectScenarioEvents } from '../src/data/scenarios.js';
 import { getGameDimensions, getTimelineModel } from '../src/game/LayoutModel.js';
 import { getActivityDefinition, getActivityStepMinutes } from '../src/data/activities.js';
+import {
+  ASSET_PACKS,
+  BREAKFAST_ASSET_PLAN,
+  SHARED_ACTION_CLIPS,
+  getAssetPlan
+} from '../src/data/assetManifest.js';
 
 const events = [
   { id: 'interrupt', at: 7 * 60, title: 'Interruption', body: '', minutes: 20, staminaDelta: -5, additional: true, interruption: true },
@@ -368,4 +374,27 @@ test('day state records completed and unfinished physical work', () => {
   shift.worldState.breakfast = { status: 'unfinished', remainingMinutes: 20 };
   shift.worldState.breakfast = { status: 'complete', remainingMinutes: 0 };
   assert.equal(shift.worldState.breakfast.status, 'complete');
+});
+
+test('every activity environment resolves to a production asset pack', () => {
+  for (const task of TASKS) {
+    const activity = getActivityDefinition(task);
+    const plan = getAssetPlan(activity);
+
+    assert.equal(plan.pack.id, activity.environment);
+    assert.match(plan.pack.environmentModel, /^\/assets\/3d\/environments\/.+\.glb$/);
+    assert.ok(plan.pack.camera.fov >= 35 && plan.pack.camera.fov <= 45);
+  }
+});
+
+test('breakfast asset bindings cover every authored activity step', () => {
+  const breakfast = getActivityDefinition(TASKS.find((task) => task.id === 'breakfast'));
+
+  assert.deepEqual(Object.keys(BREAKFAST_ASSET_PLAN.stepBindings), breakfast.steps.map((step) => step.id));
+  for (const binding of Object.values(BREAKFAST_ASSET_PLAN.stepBindings)) {
+    assert.ok(binding.clips.every((clip) => SHARED_ACTION_CLIPS.includes(clip)));
+    assert.ok(binding.requiredAnchors.length > 0);
+    assert.ok(Object.keys(binding.state).length > 0);
+  }
+  assert.equal(ASSET_PACKS.kitchen.status, 'specified');
 });

@@ -115,3 +115,12 @@ keeping the labour simulation authoritative:
 - The fixed-camera scenes use simple geometry, capped pixel density, reusable
   materials, touch-sized controls, keyboard-operable DOM alternatives, and a
   reduced-motion path for practical browser and mobile performance.
+
+### Asset production foundation
+
+The grounded Nigerian household art direction, modelling budgets, interaction
+anchor conventions and stateful-prop rules live in
+[`docs/ART_BIBLE.md`](docs/ART_BIBLE.md). The first production package is the
+[`breakfast vertical slice`](docs/BREAKFAST_VERTICAL_SLICE.md), backed by a
+runtime-facing asset manifest while the current primitive scenes remain the
+loading and compatibility fallback.
